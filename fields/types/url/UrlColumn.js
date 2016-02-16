@@ -1,6 +1,6 @@
 import React from 'react';
-import ItemsTableCell from '../../../admin/src/components/ItemsTableCell';
-import ItemsTableValue from '../../../admin/src/components/ItemsTableValue';
+import ItemsTableCell from '../../../admin/client/components/ItemsTableCell';
+import ItemsTableValue from '../../../admin/client/components/ItemsTableValue';
 
 var UrlColumn = React.createClass({
 	displayName: 'UrlColumn',
@@ -34,7 +34,7 @@ var UrlColumn = React.createClass({
 				{this.renderValue()}
 			</ItemsTableCell>
 		);
-	}
+	},
 });
 
 module.exports = UrlColumn;

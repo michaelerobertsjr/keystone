@@ -2,6 +2,7 @@ import _ from 'underscore';
 import bytes from 'bytes';
 import Field from '../Field';
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { Button, FormField, FormInput, FormNote } from 'elemental';
 
 /**
@@ -13,7 +14,7 @@ const ICON_EXTS = [
 	'aac', 'ai', 'aiff', 'avi', 'bmp', 'c', 'cpp', 'css', 'dat', 'dmg', 'doc', 'dotx', 'dwg', 'dxf', 'eps', 'exe', 'flv', 'gif', 'h',
 	'hpp', 'html', 'ics', 'iso', 'java', 'jpg', 'js', 'key', 'less', 'mid', 'mp3', 'mp4', 'mpg', 'odf', 'ods', 'odt', 'otp', 'ots',
 	'ott', 'pdf', 'php', 'png', 'ppt', 'psd', 'py', 'qt', 'rar', 'rb', 'rtf', 'sass', 'scss', 'sql', 'tga', 'tgz', 'tiff', 'txt',
-	'wav', 'xls', 'xlsx', 'xml', 'yml', 'zip'
+	'wav', 'xls', 'xlsx', 'xml', 'yml', 'zip',
 ];
 
 var LocalFilesFieldItem = React.createClass({
@@ -25,13 +26,13 @@ var LocalFilesFieldItem = React.createClass({
 		size: React.PropTypes.number,
 		toggleDelete: React.PropTypes.func,
 	},
-	
+
 	renderActionButton () {
 		if (!this.props.shouldRenderActionButton || this.props.isQueued) return null;
-		
+
 		var buttonLabel = this.props.deleted ? 'Undo' : 'Remove';
 		var buttonType = this.props.deleted ? 'link' : 'link-cancel';
-		
+
 		return <Button key="action-button" type={buttonType} onClick={this.props.toggleDelete}>{buttonLabel}</Button>;
 	},
 
@@ -41,9 +42,8 @@ var LocalFilesFieldItem = React.createClass({
 
 		let iconName = '_blank';
 		if (_.contains(ICON_EXTS, ext)) iconName = ext;
-		
-		let note;
 
+		let note;
 		if (this.props.deleted) {
 			note = <FormInput key="delete-note" noedit className="field-type-localfiles__note field-type-localfiles__note--delete">save to delete</FormInput>;
 		} else if (this.props.isQueued) {
@@ -52,7 +52,7 @@ var LocalFilesFieldItem = React.createClass({
 
 		return (
 			<FormField>
-				<img key="file-type-icon" className="file-icon" src={'/keystone/images/icons/32/' + iconName + '.png'} />
+				<img key="file-type-icon" className="file-icon" src={Keystone.adminPath + '/images/icons/32/' + iconName + '.png'} />
 				<FormInput key="file-name" noedit className="field-type-localfiles__filename">
 					{filename}
 					{this.props.size ? ' (' + bytes(this.props.size) + ')' : null}
@@ -61,7 +61,7 @@ var LocalFilesFieldItem = React.createClass({
 				{this.renderActionButton()}
 			</FormField>
 		);
-	}
+	},
 
 });
 
@@ -78,15 +78,15 @@ module.exports = Field.create({
 		return { items: items };
 	},
 
-	removeItem (i) {
-		var thumbs = this.state.items;
-		var thumb = thumbs[i];
-
-		if (thumb.props.isQueued) {
-			thumbs[i] = null;
-		} else {
-			thumb.props.deleted = !thumb.props.deleted;
-		}
+	removeItem (id) {
+		var thumbs = [];
+		var self = this;
+		_.each(this.state.items, function (thumb) {
+			if (thumb.props._id === id) {
+				thumb.props.deleted = !thumb.props.deleted;
+			}
+			self.pushItem(thumb.props, thumbs);
+		});
 
 		this.setState({ items: thumbs });
 	},
@@ -94,13 +94,14 @@ module.exports = Field.create({
 	pushItem (args, thumbs) {
 		thumbs = thumbs || this.state.items;
 		var i = thumbs.length;
-		args.toggleDelete = this.removeItem.bind(this, i);
+		args.toggleDelete = this.removeItem.bind(this, args._id);
 		args.shouldRenderActionButton = this.shouldRenderField();
-		thumbs.push(<LocalFilesFieldItem key={i} {...args} />);
+		args.adminPath = Keystone.adminPath;
+		thumbs.push(<LocalFilesFieldItem key={args._id} {...args} />);
 	},
 
 	fileFieldNode () {
-		return this.refs.fileField.getDOMNode();
+		return ReactDOM.findDOMNode(this.refs.fileField);
 	},
 
 	renderFileField () {
@@ -113,7 +114,7 @@ module.exports = Field.create({
 		this.setState({
 			items: this.state.items.filter(function (thumb) {
 				return !thumb.props.isQueued;
-			})
+			}),
 		});
 	},
 
@@ -137,7 +138,7 @@ module.exports = Field.create({
 
 	renderToolbar () {
 		if (!this.shouldRenderField()) return null;
-		
+
 		var clearFilesButton;
 		if (this.hasFiles()) {
 			clearFilesButton = <Button type="link-cancel" className="ml-5" onClick={this.clearFiles}>Clear Uploads</Button>;
@@ -191,7 +192,7 @@ module.exports = Field.create({
 		return <input ref="uploads" className="field-uploads" type="hidden" name={this.props.paths.uploads} />;
 	},
 
-	renderNote: function() {
+	renderNote: function () {
 		if (!this.props.note) return null;
 		return <FormNote note={this.props.note} />;
 	},
@@ -207,5 +208,5 @@ module.exports = Field.create({
 				{this.renderNote()}
 			</FormField>
 		);
-	}
+	},
 });

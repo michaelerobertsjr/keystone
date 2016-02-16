@@ -1,6 +1,6 @@
 import React from 'react';
-import ItemsTableCell from '../../../admin/src/components/ItemsTableCell';
-import ItemsTableValue from '../../../admin/src/components/ItemsTableValue';
+import ItemsTableCell from '../../../admin/client/components/ItemsTableCell';
+import ItemsTableValue from '../../../admin/client/components/ItemsTableValue';
 
 const moreIndicatorStyle = {
 	color: '#bbb',
@@ -25,7 +25,7 @@ var RelationshipColumn = React.createClass({
 				items.push(<span key={'comma' + i}>, </span>);
 			}
 			items.push(
-				<ItemsTableValue interior truncate={false} key={'anchor' + i} href={'/keystone/' + refList.path + '/' + value[i].id}>
+				<ItemsTableValue interior truncate={false} key={'anchor' + i} href={Keystone.adminPath + '/' + refList.path + '/' + value[i].id}>
 					{value[i].name}
 				</ItemsTableValue>
 			);
@@ -43,7 +43,7 @@ var RelationshipColumn = React.createClass({
 		if (!value) return;
 		let refList = this.props.col.field.refList;
 		return (
-			<ItemsTableValue href={'/keystone/' + refList.path + '/' + value.id} padded interior field={this.props.col.type}>
+			<ItemsTableValue href={Keystone.adminPath + '/' + refList.path + '/' + value.id} padded interior field={this.props.col.type}>
 				{value.name}
 			</ItemsTableValue>
 		);
@@ -56,7 +56,7 @@ var RelationshipColumn = React.createClass({
 				{many ? this.renderMany(value) : this.renderValue(value)}
 			</ItemsTableCell>
 		);
-	}
+	},
 });
 
 module.exports = RelationshipColumn;

@@ -4,7 +4,7 @@ var AzureFileColumn = React.createClass({
 	renderValue () {
 		var value = this.props.data.fields[this.props.col.path];
 		if (!value) return;
-		return <a href={value.url} target='_blank'>{value.url}</a>;
+		return <a href={value.url} target="_blank">{value.url}</a>;
 	},
 	render () {
 		return (
@@ -12,7 +12,7 @@ var AzureFileColumn = React.createClass({
 				<div className="ItemList__value ItemList__value--azure-file">{this.renderValue()}</div>
 			</td>
 		);
-	}
+	},
 });
 
 module.exports = AzureFileColumn;
