@@ -1,6 +1,6 @@
 import React from 'react';
-import ItemsTableCell from '../../../admin/client/components/ItemsTableCell';
-import ItemsTableValue from '../../../admin/client/components/ItemsTableValue';
+import ItemsTableCell from '../../components/ItemsTableCell';
+import ItemsTableValue from '../../components/ItemsTableValue';
 
 var InvalidColumn = React.createClass({
 	displayName: 'InvalidColumn',

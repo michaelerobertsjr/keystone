@@ -1,36 +1,38 @@
-/*!
- * Module dependencies.
- */
+/**
+Deprecated.
 
+This FieldType will be removed shortly in favour of the new generic File type,
+in conjunction with the FS storage adapter.
+*/
+
+var _ = require('lodash');
+var FieldType = require('../Type');
 var fs = require('fs-extra');
-var path = require('path');
-var _ = require('underscore');
-var moment = require('moment');
 var grappling = require('grappling-hook');
+var moment = require('moment');
+var path = require('path');
 var util = require('util');
 var utils = require('keystone-utils');
-var super_ = require('../Type');
+
+var loggedWarning = false;
 
 /**
  * localfile FieldType Constructor
  * @extends Field
  * @api public
  */
-
 function localfile (list, path, options) {
-	grappling.mixin(this)
-		.allowHooks('move');
+
+	if (!loggedWarning) {
+		loggedWarning = true;
+		console.warn('The LocalFile field type has been deprecated and will be removed '
+			+ 'very soon. Please see https://github.com/keystonejs/keystone/issues/3228');
+	}
+
+	grappling.mixin(this).allowHooks('move');
 	this._underscoreMethods = ['format', 'uploadFile'];
 	this._fixedSize = 'full';
-
-	// TODO: implement filtering, usage disabled for now
-	options.nofilter = true;
-
-	// TODO: implement initial form, usage disabled for now
-	if (options.initial) {
-		throw new Error('Invalid Configuration\n\n' +
-			'localfile fields (' + list.key + '.' + path + ') do not currently support being used as initial fields.\n');
-	}
+	this.autoCleanup = options.autoCleanup || false;
 
 	if (options.overwrite !== false) {
 		options.overwrite = true;
@@ -40,8 +42,8 @@ function localfile (list, path, options) {
 
 	// validate destination dir
 	if (!options.dest) {
-		throw new Error('Invalid Configuration\n\n' +
-			'localfile fields (' + list.key + '.' + path + ') require the "dest" option to be set.');
+		throw new Error('Invalid Configuration\n\n'
+			+ 'localfile fields (' + list.key + '.' + path + ') require the "dest" option to be set.');
 	}
 	// Allow hook into before and after
 	if (options.pre && options.pre.move) {
@@ -53,20 +55,14 @@ function localfile (list, path, options) {
 	}
 
 }
-
-/*!
- * Inherit from Field
- */
-
-util.inherits(localfile, super_);
-
+localfile.properName = 'LocalFile';
+util.inherits(localfile, FieldType);
 
 /**
  * Registers the field on the List's Mongoose Schema.
  *
  * @api public
  */
-
 localfile.prototype.addToSchema = function () {
 
 	var field = this;
@@ -153,7 +149,7 @@ localfile.prototype.addToSchema = function () {
 		},
 	};
 
-	_.each(schemaMethods, function (fn, key) {
+	_.forEach(schemaMethods, function (fn, key) {
 		field.underscoreMethod(key, fn);
 	});
 
@@ -165,14 +161,12 @@ localfile.prototype.addToSchema = function () {
 	this.bindUnderscoreMethods();
 };
 
-
 /**
  * Formats the field value
  *
  * Delegates to the options.format function if it exists.
  * @api public
  */
-
 localfile.prototype.format = function (item) {
 	if (!item.get(this.paths.filename)) return '';
 	if (this.hasFormatter()) {
@@ -183,79 +177,97 @@ localfile.prototype.format = function (item) {
 	return this.href(item);
 };
 
-
 /**
  * Detects whether the field has formatter function
  *
  * @api public
  */
-
 localfile.prototype.hasFormatter = function () {
 	return typeof this.options.format === 'function';
 };
-
 
 /**
  * Return the public href for the stored file
  *
  * @api public
  */
-
 localfile.prototype.href = function (item) {
 	if (!item.get(this.paths.filename)) return '';
 	var prefix = this.options.prefix ? this.options.prefix : item.get(this.paths.path);
 	return prefix + '/' + item.get(this.paths.filename);
 };
 
-
 /**
  * Detects whether the field has been modified
  *
  * @api public
  */
-
 localfile.prototype.isModified = function (item) {
 	return item.isModified(this.paths.path);
 };
 
 
+function validateInput (value) {
+	// undefined values are always valid
+	if (value === undefined) return true;
+	// TODO: strings may not actually be valid but this will be OK for now
+	// If a string is provided, assume it's a file path and move the file into
+	// place. Come back and check the file actually exists if a string is provided
+	if (typeof value === 'string') return true;
+	// If the value is an object with a path, it is valid
+	if (typeof value === 'object' && value.path) return true;
+	return false;
+}
+
+/**
+ * Validates that a value for this field has been provided in a data object
+ */
+localfile.prototype.validateInput = function (data, callback) {
+	var value = this.getValueFromData(data);
+	utils.defer(callback, validateInput(value));
+};
+
+/**
+ * Validates that input has been provided
+ */
+localfile.prototype.validateRequiredInput = function (item, data, callback) {
+	var value = this.getValueFromData(data);
+	var result = (value || item.get(this.path).path) ? true : false;
+	utils.defer(callback, result);
+};
+
 /**
  * Validates that a value for this field has been provided in a data object
  *
- * @api public
+ * Deprecated
  */
-
 localfile.prototype.inputIsValid = function (data) { // eslint-disable-line no-unused-vars
 	// TODO - how should file field input be validated?
 	return true;
 };
-
 
 /**
  * Updates the value for this field in the item from a data object
  *
  * @api public
  */
-
 localfile.prototype.updateItem = function (item, data, callback) { // eslint-disable-line no-unused-vars
 	// TODO - direct updating of data (not via upload)
 	process.nextTick(callback);
 };
-
 
 /**
  * Uploads the file for this field
  *
  * @api public
  */
-
 localfile.prototype.uploadFile = function (item, file, update, callback) {
 	var field = this;
 	var prefix = field.options.datePrefix ? moment().format(field.options.datePrefix) + '-' : '';
 	var filename = prefix + file.name;
 	var filetype = file.mimetype || file.type;
 
-	if (field.options.allowedTypes && !_.contains(field.options.allowedTypes, filetype)) {
+	if (field.options.allowedTypes && !_.includes(field.options.allowedTypes, filetype)) {
 		return callback(new Error('Unsupported File Type: ' + filetype));
 	}
 
@@ -303,7 +315,6 @@ localfile.prototype.uploadFile = function (item, file, update, callback) {
 	});
 };
 
-
 /**
  * Returns a callback that handles a standard form submission for the field
  *
@@ -313,7 +324,6 @@ localfile.prototype.uploadFile = function (item, file, update, callback) {
  *
  * @api public
  */
-
 localfile.prototype.getRequestHandler = function (item, req, paths, callback) {
 
 	var field = this;
@@ -347,20 +357,14 @@ localfile.prototype.getRequestHandler = function (item, req, paths, callback) {
 
 };
 
-
 /**
  * Immediately handles a standard form submission for the field (see `getRequestHandler()`)
  *
  * @api public
  */
-
 localfile.prototype.handleRequest = function (item, req, paths, callback) {
 	this.getRequestHandler(item, req, paths, callback)();
 };
 
-
-/*!
- * Export class
- */
-
+/* Export Field Type */
 module.exports = localfile;

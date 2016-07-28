@@ -12,9 +12,10 @@ const DEFAULT_INPUT_FORMAT = 'YYYY-MM-DD';
 const DEFAULT_FORMAT_STRING = 'Do MMM YYYY';
 
 module.exports = Field.create({
-
 	displayName: 'DateField',
-
+	statics: {
+		type: 'Date',
+	},
 	propTypes: {
 		formatString: React.PropTypes.string,
 		inputFormat: React.PropTypes.string,
@@ -31,43 +32,50 @@ module.exports = Field.create({
 			inputFormat: DEFAULT_INPUT_FORMAT,
 		};
 	},
-
-	valueChanged (value) {
+	valueChanged ({ value }) {
 		this.props.onChange({
 			path: this.props.path,
 			value: value,
 		});
 	},
-
 	moment (value) {
 		var m = moment(value);
 		if (this.props.isUTC) m.utc();
 		return m;
 	},
-
 	isValid (value) {
 		return this.moment(value, this.inputFormat).isValid();
 	},
-
 	format (value) {
 		return value ? this.moment(value).format(this.props.formatString) : '';
 	},
-
 	setToday () {
-		this.valueChanged(this.moment(new Date()).format(this.props.inputFormat));
+		this.valueChanged({
+			value: this.moment(new Date()).format(this.props.inputFormat),
+		});
 	},
-
 	renderValue () {
-		return <FormInput noedit>{this.format(this.props.value)}</FormInput>;
+		return (
+			<FormInput noedit>
+				{this.format(this.props.value)}
+			</FormInput>
+		);
 	},
-
 	renderField () {
 		let value = this.moment(this.props.value);
-		value = this.props.value && value.isValid() ? value.format(this.props.formatString) : this.props.value;
+		value = this.props.value && value.isValid()
+			? value.format(this.props.inputFormat)
+			: this.props.value;
 		return (
 			<InputGroup>
 				<InputGroup.Section grow>
-					<DateInput ref="dateInput" name={this.props.path} format={this.props.inputFormat} value={value} onChange={this.valueChanged} />
+					<DateInput
+						format={this.props.inputFormat}
+						name={this.props.path}
+						onChange={this.valueChanged}
+						ref="dateInput"
+						value={value}
+					/>
 				</InputGroup.Section>
 				<InputGroup.Section>
 					<Button onClick={this.setToday}>Today</Button>

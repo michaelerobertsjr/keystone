@@ -1,5 +1,5 @@
 var React = require('react');
-var ReactDOM = require('react-dom');
+import { findDOMNode } from 'react-dom';
 
 var Button = require('elemental').Button;
 var FormField = require('elemental').FormField;
@@ -20,7 +20,7 @@ function reduceValues (values) {
 module.exports = {
 	getInitialState: function () {
 		return {
-			values: this.props.value.map(newItem),
+			values: Array.isArray(this.props.value) ? this.props.value.map(newItem) : [],
 		};
 	},
 
@@ -33,13 +33,12 @@ module.exports = {
 	},
 
 	addItem: function () {
-		var self = this;
 		var newValues = this.state.values.concat(newItem(''));
 		this.setState({
 			values: newValues,
 		}, () => {
 			if (!this.state.values.length) return;
-			ReactDOM.findDOMNode(this.refs['item_' + this.state.values.length]).focus();
+			findDOMNode(this.refs['item_' + this.state.values.length]).focus();
 		});
 		this.valueChanged(reduceValues(newValues));
 	},
@@ -49,7 +48,7 @@ module.exports = {
 		this.setState({
 			values: newValues,
 		}, function () {
-			ReactDOM.findDOMNode(this.refs.button).focus();
+			findDOMNode(this.refs.button).focus();
 		});
 		this.valueChanged(reduceValues(newValues));
 	},
@@ -57,7 +56,8 @@ module.exports = {
 	updateItem: function (i, event) {
 		var updatedValues = this.state.values;
 		var updateIndex = updatedValues.indexOf(i);
-		updatedValues[updateIndex].value = this.cleanInput ? this.cleanInput(event.target.value) : event.target.value;
+		var newValue = event.value || event.target.value;
+		updatedValues[updateIndex].value = this.cleanInput ? this.cleanInput(newValue) : newValue;
 		this.setState({
 			values: updatedValues,
 		});

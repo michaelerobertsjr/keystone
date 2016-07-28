@@ -1,9 +1,8 @@
-import _ from 'underscore';
+import _ from 'lodash';
 import React from 'react';
-import ReactDOM from 'react-dom';
 import Field from '../Field';
 import { Button, FormField, FormInput, FormNote } from 'elemental';
-import Lightbox from '../../../admin/client/components/Lightbox';
+import Lightbox from '../../components/Lightbox';
 import classnames from 'classnames';
 
 const SUPPORTED_TYPES = ['image/gif', 'image/png', 'image/jpeg', 'image/bmp', 'image/x-icon', 'application/pdf', 'image/x-tiff', 'image/x-tiff', 'application/postscript', 'image/vnd.adobe.photoshop', 'image/svg+xml'];
@@ -34,6 +33,21 @@ var Thumbnail = React.createClass({
 		width: React.PropTypes.number,
 	},
 
+	applyTransforms (url) {
+		var format = this.props.format;
+
+		if (format === 'pdf') {
+			// support cloudinary pdf previews in jpg format
+			url = url.substr(0, url.lastIndexOf('.')) + '.jpg';
+			url = url.replace(/image\/upload/, 'image/upload/c_thumb,h_90,w_90');
+		} else {
+			// add cloudinary thumbnail parameters to the url
+			url = url.replace(/image\/upload/, 'image/upload/c_thumb,g_face,h_90,w_90');
+		}
+
+		return url;
+	},
+
 	renderActionButton () {
 		if (!this.props.shouldRenderActionButton || this.props.isQueued) return null;
 		return <Button type={this.props.deleted ? 'link-text' : 'link-cancel'} block onClick={this.props.toggleDelete}>{this.props.deleted ? 'Undo' : 'Remove'}</Button>;
@@ -41,11 +55,11 @@ var Thumbnail = React.createClass({
 
 	render () {
 		let iconClassName;
-		let { deleted, height, isQueued, url, width, openLightbox } = this.props;
-		let previewClassName = classnames('image-preview', {
+		const { deleted, height, isQueued, url, width, openLightbox, format } = this.props;
+		const previewClassName = classnames('image-preview', {
 			action: (deleted || isQueued),
 		});
-		let title = (width && height) ? (width + ' × ' + height) : '';
+		const title = (width && height) ? (width + ' × ' + height) : '';
 
 		if (deleted) {
 			iconClassName = classnames(iconClassDeleted);
@@ -53,11 +67,14 @@ var Thumbnail = React.createClass({
 			iconClassName = classnames(iconClassQueued);
 		}
 
+		const shouldOpenLightbox = (format !== 'pdf');
+		let thumbUrl = this.applyTransforms(url);
+
 		return (
 			<div className="image-field image-sortable" title={title}>
 				<div className={previewClassName}>
-					<a href={url} onClick={openLightbox} className="img-thumbnail">
-						<img style={{ height: '90' }} className="img-load" src={url} />
+					<a href={url} onClick={shouldOpenLightbox ? openLightbox : null} className="img-thumbnail" target="_blank">
+						<img style={{ height: '90' }} className="img-load" src={thumbUrl} />
 						<span className={iconClassName} />
 					</a>
 				</div>
@@ -69,12 +86,16 @@ var Thumbnail = React.createClass({
 });
 
 module.exports = Field.create({
+	displayName: 'CloudinaryImagesField',
+	statics: {
+		type: 'CloudinaryImages',
+	},
 
 	getInitialState () {
 		var thumbnails = [];
 		var self = this;
 
-		_.each(this.props.value, function (item) {
+		_.forEach(this.props.value, function (item) {
 			self.pushThumbnail(item, thumbnails);
 		});
 
@@ -99,7 +120,7 @@ module.exports = Field.create({
 	renderLightbox () {
 		if (!this.props.value || !this.props.value.length) return;
 
-		let images = this.props.value.map(image => image.url);
+		const images = this.props.value.map(image => image.url);
 
 		return (
 			<Lightbox
@@ -134,13 +155,13 @@ module.exports = Field.create({
 	},
 
 	fileFieldNode () {
-		return ReactDOM.findDOMNode(this.refs.fileField);
+		return this.refs.fileField;
 	},
 
 	getCount (key) {
 		var count = 0;
 
-		_.each(this.state.thumbnails, function (thumb) {
+		_.forEach(this.state.thumbnails, function (thumb) {
 			if (thumb && thumb.props[key]) count++;
 		});
 
@@ -167,8 +188,8 @@ module.exports = Field.create({
 		var self = this;
 
 		var files = event.target.files;
-		_.each(files, function (f) {
-			if (!_.contains(SUPPORTED_TYPES, f.type)) {
+		_.forEach(files, function (f) {
+			if (!_.includes(SUPPORTED_TYPES, f.type)) {
 				alert('Unsupported file type. Supported formats are: GIF, PNG, JPG, BMP, ICO, PDF, TIFF, EPS, PSD, SVG');
 				return;
 			}
@@ -259,7 +280,7 @@ module.exports = Field.create({
 
 		var value = '';
 		var remove = [];
-		_.each(this.state.thumbnails, function (thumb) {
+		_.forEach(this.state.thumbnails, function (thumb) {
 			if (thumb && thumb.props.deleted) remove.push(thumb.props.public_id);
 		});
 		if (remove.length) value = 'remove:' + remove.join(',');
@@ -279,7 +300,7 @@ module.exports = Field.create({
 
 	renderUI () {
 		return (
-			<FormField label={this.props.label} className="field-type-cloudinaryimages">
+			<FormField label={this.props.label} className="field-type-cloudinaryimages" htmlFor={this.props.path}>
 				{this.renderFieldAction()}
 				{this.renderUploadsField()}
 				{this.renderFileField()}

@@ -1,8 +1,9 @@
-var _ = require('underscore');
+var _ = require('lodash');
 var FieldType = require('../Type');
 var keystone = require('../../../');
 var util = require('util');
 var utils = require('keystone-utils');
+var definePrototypeGetters = require('../../utils/definePrototypeGetters');
 
 /**
  * Relationship FieldType Constructor
@@ -15,10 +16,11 @@ function relationship (list, path, options) {
 	this.createInline = (options.createInline) ? true : false;
 	this._defaultSize = 'full';
 	this._nativeType = keystone.mongoose.Schema.Types.ObjectId;
-	this._underscoreMethods = ['format'];
+	this._underscoreMethods = ['format', 'getExpandedData'];
 	this._properties = ['isValid', 'many', 'filters', 'createInline'];
 	relationship.super_.call(this, list, path, options);
 }
+relationship.properName = 'Relationship';
 util.inherits(relationship, FieldType);
 
 /**
@@ -82,26 +84,14 @@ relationship.prototype.addToSchema = function () {
 	schema.virtual(this.paths.refList).get(function () {
 		return keystone.list(field.options.ref);
 	});
-	if (this.many) {
-		this.underscoreMethod('contains', function (find) {
-			var value = this.populated(field.path) || this.get(field.path);
-			if (typeof find === 'object') {
-				find = find.id;
-			}
-			var result = _.some(value, function (value) {
-				return (value + '' === find);
-			});
-			return result;
-		});
-	}
 	this.bindUnderscoreMethods();
 };
 
 /**
  * Add filters to a query
  */
-relationship.prototype.addFilterToQuery = function (filter, query) {
-	query = query || {};
+relationship.prototype.addFilterToQuery = function (filter) {
+	var query = {};
 	if (!Array.isArray(filter.value)) {
 		if (typeof filter.value === 'string' && filter.value) {
 			filter.value = [filter.value];
@@ -131,7 +121,72 @@ relationship.prototype.format = function (item) {
 };
 
 /**
+ * Asynchronously confirms that the provided value is valid
+ *
+ * TODO: might be a good idea to check the value provided looks like a MongoID
+ * TODO: we're just testing for strings here, so actual MongoID Objects (from
+ * mongoose) would fail validation. not sure if this is an issue.
+ */
+relationship.prototype.validateInput = function (data, callback) {
+	var value = this.getValueFromData(data);
+	var result = false;
+	if (value === undefined || value === null || value === '') {
+		result = true;
+	} else {
+		if (this.many) {
+			if (!Array.isArray(value) && typeof value === 'string' && value.length) {
+				value = [value];
+			}
+			if (Array.isArray(value)) {
+				result = true;
+			}
+		} else {
+			if (typeof value === 'string' && value.length) {
+				result = true;
+			}
+			if (typeof value === 'object' && value.id) {
+				result = true;
+			}
+		}
+	}
+	utils.defer(callback, result);
+};
+
+/**
+ * Asynchronously confirms that the provided value is present
+ */
+relationship.prototype.validateRequiredInput = function (item, data, callback) {
+	var value = this.getValueFromData(data);
+	var result = false;
+	if (value === undefined) {
+		if (this.many) {
+			if (item.get(this.path).length) {
+				result = true;
+			}
+		} else {
+			if (item.get(this.path)) {
+				result = true;
+			}
+		}
+	} else if (this.many) {
+		if (!Array.isArray(value) && typeof value === 'string' && value.length) {
+			value = [value];
+		}
+		if (Array.isArray(value) && value.length) {
+			result = true;
+		}
+	} else {
+		if (value) {
+			result = true;
+		}
+	}
+	utils.defer(callback, result);
+};
+
+/**
  * Validates that a value for this field has been provided in a data object
+ *
+ * Deprecated
  */
 relationship.prototype.inputIsValid = function (data, required, item) {
 	if (!required) return true;
@@ -147,11 +202,9 @@ relationship.prototype.inputIsValid = function (data, required, item) {
  * Updates the value for this field in the item from a data object.
  * Only updates the value if it has changed.
  * Treats an empty string as a null value.
+ * If data object does not contain the path field, then delete the field.
  */
 relationship.prototype.updateItem = function (item, data, callback) {
-	if (!(this.path in data)) {
-		return process.nextTick(callback);
-	}
 	if (item.populated(this.path)) {
 		throw new Error('fieldTypes.relationship.updateItem() Error - You cannot update populated relationships.');
 	}
@@ -179,54 +232,20 @@ relationship.prototype.updateItem = function (item, data, callback) {
 	process.nextTick(callback);
 };
 
-/**
- * Returns true if the relationship configuration is valid
- */
-Object.defineProperty(relationship.prototype, 'isValid', {
-	get: function () {
+definePrototypeGetters(relationship, {
+	// Returns true if the relationship configuration is valid
+	isValid: function () {
 		return keystone.list(this.options.ref) ? true : false;
 	},
-});
-
-/**
- * Returns the Related List
- */
-Object.defineProperty(relationship.prototype, 'refList', {
-	get: function () {
+	// Returns the Related List
+	refList: function () {
 		return keystone.list(this.options.ref);
 	},
-});
-
-/**
- * Whether the field has any filters defined
- */
-Object.defineProperty(relationship.prototype, 'hasFilters', {
-	get: function () {
+	// Whether the field has any filters defined
+	hasFilters: function () {
 		return (this.filters && _.keys(this.filters).length);
 	},
 });
-
-/**
- * Adds relationship filters to a query
- */
-// TODO: Deprecate this? Not sure it's used anywhere - JW
-relationship.prototype.addFilters = function (query, item) {
-	_.each(this.filters, function (filters, path) {
-		if (!utils.isObject(filters)) {
-			filters = { equals: filters };
-		}
-		query.where(path);
-		_.each(filters, function (value, method) {
-			if (typeof value === 'string' && value.substr(0, 1) === ':') {
-				if (!item) {
-					return;
-				}
-				value = item.get(value.substr(1));
-			}
-			query[method](value);
-		});
-	});
-};
 
 /* Export Field Type */
 module.exports = relationship;

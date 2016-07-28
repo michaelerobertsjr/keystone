@@ -1,7 +1,8 @@
-var _ = require('underscore');
+var _ = require('lodash');
 var bcrypt = require('bcrypt-nodejs');
 var FieldType = require('../Type');
 var util = require('util');
+var utils = require('keystone-utils');
 
 /**
  * password FieldType Constructor
@@ -18,6 +19,7 @@ function password (list, path, options) {
 	this.workFactor = options.workFactor || 10;
 	password.super_.call(this, list, path, options);
 }
+password.properName = 'Password';
 util.inherits(password, FieldType);
 
 /**
@@ -33,8 +35,8 @@ password.prototype.addToSchema = function () {
 	var needs_hashing = '__' + field.path + '_needs_hashing';
 
 	this.paths = {
-		hash: this.options.hashPath || this._path.append('_hash'),
 		confirm: this.options.confirmPath || this._path.append('_confirm'),
+		hash: this.options.hashPath || this._path.append('_hash'),
 	};
 
 	schema.path(this.path, _.defaults({
@@ -54,6 +56,9 @@ password.prototype.addToSchema = function () {
 		if (!this.isModified(field.path) || !this[needs_hashing]) {
 			return next();
 		}
+		// reset the [needs_hashing] flag so that new values can't be hashed more than once
+		// (inherited models double up on pre save handlers for password fields)
+		this[needs_hashing] = false;
 		if (!this.get(field.path)) {
 			this.set(field.path, undefined);
 			return next();
@@ -79,8 +84,8 @@ password.prototype.addToSchema = function () {
 /**
  * Add filters to a query
  */
-password.prototype.addFilterToQuery = function (filter, query) {
-	query = query || {};
+password.prototype.addFilterToQuery = function (filter) {
+	var query = {};
 	query[this.path] = (filter.exists) ? { $ne: null } : null;
 	return query;
 };
@@ -118,26 +123,28 @@ password.prototype.compare = function (item, candidate, callback) {
  * Asynchronously confirms that the provided password is valid
  */
 password.prototype.validateInput = function (data, callback) {
-	var result = true;
 	var detail;
-	// TODO: this is brittle and won't work with nested fields. needs better
-	// support of pulling nested paths out of objects before we can fix it.
-	if (this.paths.confirm in data) {
-		result = data[this.path] === data[this.paths.confirm];
-		if (!result) detail = 'passwords must match';
+	var result = true;
+	var confirmValue = this.getValueFromData(data, '_confirm');
+	var passwordValue = this.getValueFromData(data);
+	if (confirmValue !== undefined
+		&& passwordValue !== confirmValue) {
+		result = false;
+		detail = 'passwords must match';
 	}
 	// TODO: we could support a password complexity option (or regexp) here
-	process.nextTick(function () { callback(result, detail); });
+	utils.defer(callback, result, detail);
 };
 
 /**
  * Asynchronously confirms that the provided password is valid
  */
 password.prototype.validateRequiredInput = function (item, data, callback) {
-	var value = this.getValueFromData(data);
-	var result = value ? true : false;
-	if (!result && value === undefined && item && item.get(this.path)) result = true;
-	process.nextTick(function () { callback(result); });
+	var hashValue = this.getValueFromData(data, '_hash');
+	var passwordValue = this.getValueFromData(data);
+	var result = hashValue || passwordValue ? true : false;
+	if (!result && passwordValue === undefined && hashValue === undefined && item.get(this.path)) result = true;
+	utils.defer(callback, result);
 };
 
 /**
@@ -147,7 +154,7 @@ password.prototype.validateRequiredInput = function (item, data, callback) {
  * Otherwise, input is always considered valid, as providing an empty
  * value will not change the password.
  *
- * @api public
+ * Deprecated
  */
 password.prototype.inputIsValid = function (data, required, item) {
 	if (data[this.path] && this.paths.confirm in data) {
@@ -165,12 +172,12 @@ password.prototype.inputIsValid = function (data, required, item) {
  * @api public
  */
 password.prototype.updateItem = function (item, data, callback) {
-	// TODO: this is brittle and won't work with nested fields. needs better
-	// support of pulling nested paths out of objects before we can fix it.
-	if (this.path in data) {
-		item.set(this.path, data[this.path]);
-	} else if (this.paths.hash in data) {
-		item.set(this.paths.hash, data[this.paths.hash]);
+	var hashValue = this.getValueFromData(data, '_hash');
+	var passwordValue = this.getValueFromData(data);
+	if (passwordValue !== undefined) {
+		item.set(this.path, passwordValue);
+	} else if (hashValue !== undefined) {
+		item.set(this.paths.hash, hashValue);
 	}
 	process.nextTick(callback);
 };

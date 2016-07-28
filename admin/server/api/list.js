@@ -1,8 +1,13 @@
-var _ = require('underscore');
+/*
+TODO: Needs Review and Spec
+*/
+
+var _ = require('lodash');
 var async = require('async');
-var keystone = require('../../../');
 
 module.exports = function (req, res) {
+
+	var keystone = req.keystone;
 
 	var sendResponse = function (status) {
 		res.json(status);
@@ -39,7 +44,7 @@ module.exports = function (req, res) {
 				var field = srcList.fields[req.query.field];
 				if (!field) return sendError('invalid field provided');
 
-				_.each(req.query.filters, function (value, key) {
+				_.forEach(req.query.filters, function (value, key) {
 					query.where(key).equals(value ? value : null);
 					count.where(key).equals(value ? value : null);
 				});
@@ -70,7 +75,7 @@ module.exports = function (req, res) {
 			if (typeof order === 'string') {
 				order = order.split(',');
 			}
-			_.each(order, function (id, i) {
+			_.forEach(order, function (id, i) {
 				queue.push(function (done) {
 					req.list.model.update({ _id: id }, { $set: { sortOrder: i } }, done);
 				});

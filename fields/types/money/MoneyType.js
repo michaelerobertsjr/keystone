@@ -20,11 +20,17 @@ function money (list, path, options) {
 	}
 	money.super_.call(this, list, path, options);
 }
+money.properName = 'Money';
 util.inherits(money, FieldType);
+
+
+money.prototype.validateInput = NumberType.prototype.validateInput;
+money.prototype.validateRequiredInput = NumberType.prototype.validateRequiredInput;
 
 /* Inherit from NumberType prototype */
 money.prototype.updateItem = NumberType.prototype.updateItem;
 money.prototype.inputIsValid = NumberType.prototype.inputIsValid;
+money.prototype.addFilterToQuery = NumberType.prototype.addFilterToQuery;
 
 /**
  * Formats the field value

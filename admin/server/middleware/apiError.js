@@ -1,3 +1,5 @@
+var assign = require('object-assign');
+
 /*
 	This middleware simplifies returning errors from the API.
 
@@ -12,7 +14,7 @@
 
 module.exports = function (req, res, next) {
 	res.apiError = function apiError (statusCode, error, detail) {
-		if (typeof statusCode !== 'number' && arguments.length < 3) {
+		if (typeof statusCode !== 'number' && detail === undefined) {
 			detail = error;
 			error = statusCode;
 			statusCode = 500;
@@ -30,6 +32,9 @@ module.exports = function (req, res, next) {
 			? { error: error, detail: detail }
 			: error;
 		res.json(data);
+		return assign({
+			statusCode: statusCode,
+		}, data);
 	};
 	next();
 };
